@@ -42,6 +42,33 @@ def detect_candidate_contours(image, res_th=800, sat_th=100):
     contours1_filtered = [ctr for ctr in contours1 if cv2.contourArea(ctr) > float(res_th)*float(res_th)/4000]
     return contours1_filtered, img
 
+# image: Entire image containing multiple contours
+# contours: Contours contained in "image" (Retrieved by cv2.findContours(), the origin is same as "image")
+def refine_contours(image, contours):
+    subctrs = []
+    subimgs = []
+    binimgs = []
+    thresholds = []
+    n_ctrs = []
+    for ctr in contours:
+        img, _ = create_contour_area_image(image, ctr)
+        # Thresholding using G value in BGR format
+        thresh, binimg = cv2.threshold(img[:,:,1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Add black region around thresholded image, to detect contours correctly
+        binimg = cv2.copyMakeBorder(binimg, 2,2,2,2, cv2.BORDER_CONSTANT, 0)
+        ctrs2, _ = cv2.findContours(binimg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        max_len = 0
+        for ctr2 in ctrs2:
+            if max_len <= ctr2.shape[0]:
+                max_ctr = ctr2
+                max_len = ctr2.shape[0]
+        subctrs += [max_ctr]
+        subimgs += [img]
+        binimgs += [binimg]
+        thresholds += [thresh]
+        n_ctrs += [len(ctrs2)]
+    debug_info = (binimgs, thresholds, n_ctrs)
+    return subctrs, subimgs, debug_info
 
 ######################################################
 # Auxiliary functions
@@ -68,16 +95,17 @@ def create_solid_contour(ctr, img_shape=(int(0),int(0))):
 
 # ctr: Should be output of create_contour_area_image() (Origin of points is the origin of bounding box)
 def create_upright_solid_contour(ctr):
-    (cx,cy),(w,h),angle = cv2.minAreaRect(ctr)
+    ctr2 = ctr.copy()
+    (cx,cy),(w,h),angle = cv2.minAreaRect(ctr2)
     M = cv2.getRotationMatrix2D((cx,cy), angle, 1)
-    for i in range(ctr.shape[0]):
-        ctr[i,0,:] = ( M @ np.array([ctr[i,0,0], ctr[i,0,1], 1]) ).astype('int')
-    rect = cv2.boundingRect(ctr)
+    for i in range(ctr2.shape[0]):
+        ctr2[i,0,:] = ( M @ np.array([ctr2[i,0,0], ctr2[i,0,1], 1]) ).astype('int')
+    rect = cv2.boundingRect(ctr2)
     img = np.zeros((rect[3],rect[2]), 'uint8')
-    ctr -= rect[0:2]
+    ctr2 -= rect[0:2]
     M[:,2] -= rect[0:2]
-    img = cv2.drawContours(img, [ctr], -1, 255,-1)
-    return img, M, ctr
+    img = cv2.drawContours(img, [ctr2], -1, 255,-1)
+    return img, M, ctr2
 
 
 ######################################################
@@ -236,9 +264,10 @@ def get_similarities(target, templates):
     return similarities, converted_imgs
 
 def calc_harupan(img, templates, svm):
-    ctrs, resized_img = detect_candidate_contours(img)
+    ctrs, resized_img = detect_candidate_contours(img, sat_th=50)
     print('Number of candidates: ', len(ctrs))
-    subctr_datasets = [contour_dataset(create_contour_area_image(resized_img, ctr)[1]) for ctr in ctrs]
+    subctrs, _, _ = refine_contours(resized_img, ctrs)
+    subctr_datasets = [contour_dataset(ctr) for ctr in subctrs]
     ########
     #### Simple code
     # similarities = [get_similarities(d, templates)[0] for d in subctr_datasets]
