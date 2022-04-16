@@ -36,11 +36,13 @@ def detect_candidate_contours(image, res_th=800, sat_th=100):
     binimg = harupan_binarize(img, sat_th)
     # Retrieve all points on the contours (cv2.CHAIN_APPROX_NONE)
     contours, hierarchy = cv2.findContours(binimg, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    indices0 = [i for i,hier in enumerate(hierarchy[0,:,:]) if hier[3] == -1]
-    indices1 = [i for i,hier in enumerate(hierarchy[0,:,:]) if hier[3] in indices0]
-    contours1 = [contours[i] for i in indices1]
-    contours1_filtered = [ctr for ctr in contours1 if cv2.contourArea(ctr) > float(res_th)*float(res_th)/4000]
-    return contours1_filtered, img
+    # Pick up contours that have no parents
+    indices = [i for i,hier in enumerate(hierarchy[0,:,:]) if hier[3] == -1]
+    # Pick up contours that reside in above contours
+    indices = [i for i,hier in enumerate(hierarchy[0,:,:]) if (hier[3] in indices) and (hier[2] == -1) ]
+    contours = [contours[i] for i in indices]
+    contours = [ctr for ctr in contours if cv2.contourArea(ctr) > float(res_th)*float(res_th)/4000]
+    return contours, img
 
 # image: Entire image containing multiple contours
 # contours: Contours contained in "image" (Retrieved by cv2.findContours(), the origin is same as "image")
@@ -117,7 +119,18 @@ class contour_dataset:
         self.rrect = cv2.minAreaRect(ctr)
         self.box = cv2.boxPoints(self.rrect)
         self.solid = create_solid_contour(ctr)
-        self.pts = np.array([p for p in ctr[:,0,:]])
+        n = 100
+        if n >= ctr.shape[0]:
+            self.pts = np.array([p for p in ctr[:,0,:]])
+        else:            
+            r = n / ctr.shape[0]
+            self.pts = np.zeros((100,2), 'int')
+            pts = []
+            for i in range(ctr.shape[0]):
+                f = math.modf(i*r)[0] 
+                if (f <= r/2) or (f > 1.0 - r/2):
+                    pts += [ctr[i,0,:]]
+            self.pts = np.array(pts)
 
 class template_dataset:
     def __init__(self, ctr, num, selected_idx=[0]):
