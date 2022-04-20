@@ -36,6 +36,8 @@ def detect_candidate_contours(image, res_th=800, sat_th=100):
     binimg = harupan_binarize(img, sat_th)
     # Retrieve all points on the contours (cv2.CHAIN_APPROX_NONE)
     contours, hierarchy = cv2.findContours(binimg, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    if len(contours) == 0:
+        return contours, img
     # Pick up contours that have no parents
     indices = [i for i,hier in enumerate(hierarchy[0,:,:]) if hier[3] == -1]
     # Pick up contours that reside in above contours
@@ -278,18 +280,20 @@ def get_similarities(target, templates):
 
 def calc_harupan(img, templates, svm):
     ctrs, resized_img = detect_candidate_contours(img, sat_th=50)
-    print('Number of candidates: ', len(ctrs))
+    # print('Number of candidates: ', len(ctrs))
+    if len(ctrs) == 0:
+        return 0.0, resized_img
     subctrs, _, _ = refine_contours(resized_img, ctrs)
     subctr_datasets = [contour_dataset(ctr) for ctr in subctrs]
     ########
     #### Simple code
-    # similarities = [get_similarities(d, templates)[0] for d in subctr_datasets]
+    similarities = [get_similarities(d, templates)[0] for d in subctr_datasets]
     #### Code printing progress
-    similarities = []
-    for i,d in enumerate(subctr_datasets):
-        print(i, end=' ')
-        similarities += [get_similarities(d, templates)[0]]
-    print('')
+    # similarities = []
+    # for i,d in enumerate(subctr_datasets):
+    #     print(i, end=' ')
+    #     similarities += [get_similarities(d, templates)[0]]
+    # print('')
     ########
     _, result = svm.predict(np.array(similarities, 'float32'))
     result = result.astype('int')
