@@ -182,36 +182,63 @@ def estimate_affine_2d(src, dst):
 # dst_pts: ndarray, shape is (n_d,2) (n_d: number of points, n_d should be larger or equal to n_s)
 # initial_matrix: ndarray, shape is (2,3)
 def icp(src_pts, dst_pts, max_iter=20, initial_matrix=np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])):
+    search_range = 0.25
+    return icp_sub(src_pts, dst_pts, max_iter=max_iter, initial_matrix=initial_matrix, search_range=search_range)
+
+# Find optimum affine matrix using ICP algorithm
+# src_pts: ndarray, shape is (n_s,2) (n_s: number of points)
+# dst_pts: ndarray, shape is (n_d,2) (n_d: number of points, n_d should be larger or equal to n_s)
+# initial_matrix: ndarray, shape is (2,3)
+# search_range: float number, 0.0 ~ 1.0, the range to search nearest neighbor, 1.0 -> Search in all dst_pts
+def icp_sub(src_pts, dst_pts, max_iter=20, initial_matrix=np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]), search_range=0.5):
     default_affine_matrix = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
-    if dst_pts.shape[0] < src_pts.shape[0]:
-        print("icp: Insufficient destination points")
+    n_dst = dst_pts.shape[0]
+    n_src = src_pts.shape[0]
+    if n_dst < n_src:
+        # print("icp: Insufficient destination points")
         return default_affine_matrix, False
     if initial_matrix.shape != (2,3):
         print("icp: Illegal shape of initial_matrix")
         return default_affine_matrix, False
+    n_search = int(n_dst*search_range)
     M = initial_matrix
     # Store indices of the nearest neighbor point of dst_pts to the converted point of src_pts
     nn_idx = []
+    converged = False
     for i in range(max_iter):
         nn_idx_tmp = []
         dst_pts_list = [p for p in dst_pts]
         idx_list = list(range(0,dst_pts.shape[0]))
+        first_pt = True
         for p in src_pts:
+            # Convert source point with current conversion matrix
             p2 = M @ np.array([p[0], p[1], 1])
-            idx, d = find_nearest_neighbor(dst_pts_list, p2)
+            if first_pt:
+                # First point should be searched in all destination points
+                idx, _ = find_nearest_neighbor(dst_pts_list, p2)
+                first_pt = False
+            else:
+                # Search nearest neighbor point in specified range around the last point
+                n = int(min(n_search/2, len(idx_list)/2))
+                s = max(len(idx_list) + last_idx - n, 0)
+                e = min(len(idx_list) + last_idx + n, 3*len(idx_list))
+                pts = (dst_pts_list + dst_pts_list + dst_pts_list)[s:e]
+                idx, _ = find_nearest_neighbor(pts, p2)
+                # The index acquired above is counted from 's', so actual index must be recovered
+                idx = (idx + s) % len(idx_list)
             nn_idx_tmp += [idx_list[idx]]
+            last_idx = idx
             del dst_pts_list[idx]
             del idx_list[idx]
         if nn_idx != [] and nn_idx == nn_idx_tmp:
+            converged = True
             break
         dst_pts2 = np.zeros_like(src_pts)
         for j,idx in enumerate(nn_idx_tmp):
             dst_pts2[j,:] = dst_pts[idx,:]
         M = estimate_affine_2d(src_pts, dst_pts2)
         nn_idx = nn_idx_tmp
-        if i == max_iter -1:
-            return M, False
-    return M, True
+    return M, converged
 
 
 ######################################################
