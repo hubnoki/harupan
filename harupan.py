@@ -7,6 +7,12 @@ import numpy as np
 import math
 import json
 
+import tkinter as tk
+from PIL import Image, ImageOps, ImageTk
+
+import queue
+import threading
+
 ######################################################
 # Detecting contours
 ######################################################
@@ -351,3 +357,199 @@ def load_templates(filename):
             templates_rtn += [template_dataset(np.array(d['ctr']), d['num'], d['pts'])]
     return templates_rtn
 
+######################################################
+# GUI
+######################################################
+class harupan_gui(tk.Frame):
+    TEXT_CONNECT = 'Connect   '
+    TEXT_DISCONNECT = 'Disconnect'
+    TEXT_STOP = 'Stop  '
+    TEXT_RESUME = 'Resume'
+
+    def __init__(self, master=None, img_queue_size=1, svm_data='harupan_data/harupan_svm_220412.dat', template_data='harupan_data/templates2021.json'):
+        super().__init__(master)
+
+        self.cap = cv2.VideoCapture()
+        self.open_params = (cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
+        self.svm = load_svm(svm_data)
+        self.templates = load_templates(template_data)
+
+        #### Main window settings ####
+        self.master.title('Harupan App')
+        self.master.geometry('500x400')
+        self.master.protocol('WM_DELETE_WINDOW', self.cleanup_app)
+        self.master.bind('<Configure>', self.update_canvas_size)
+
+        #### Sub frames ####
+        self.frame_connection = tk.Frame(self)
+        self.frame_log = tk.Frame(self.frame_connection, width=120, height=30)
+        self.frame_log.propagate(False)
+        self.frame_canvas = tk.Frame(self)
+        self.frame_canvas.config(relief='ridge', bd=5)
+        self.frame_result = tk.Frame(self)
+
+        #### Entries for connection information ####
+        self.t_ip = tk.StringVar(value='192.168.1.7')
+        self.t_port = tk.StringVar(value='4747')
+        self.entry_ip = tk.Entry(self.frame_connection, textvariable=self.t_ip)
+        self.entry_port = tk.Entry(self.frame_connection, textvariable=self.t_port)
+
+        #### Connect button ####
+        self.t_connect = tk.StringVar(value=self.TEXT_CONNECT)
+        self.button_connect = tk.Button(self.frame_connection, textvariable=self.t_connect)
+        self.button_connect.bind('<Button-1>', self.event_connect)
+
+        #### Connection log ####
+        self.t_log = tk.StringVar()
+        self.label_log = tk.Label(self.frame_log, textvariable=self.t_log)
+
+        #### Image canvas ####
+        self.canvas_image = tk.Canvas(self.frame_canvas, bg='white')
+        self.disp_img = None
+
+        #### Label for calculation result ####
+        self.t_calc_result = tk.StringVar(value=' 0 points')
+        self.label_points = tk.Label(self.frame_result, bg='black', fg='green', font=('Consolas', 20), textvariable=self.t_calc_result)
+
+        #### Stop button ####
+        self.t_stop = tk.StringVar(value=self.TEXT_STOP)
+        self.button_stop = tk.Button(self.frame_result, textvariable=self.t_stop)
+        self.button_stop.bind('<Button-1>', self.event_stop_button)
+
+        #### Place widgets ####
+        self.pack(expand=True, fill='both')
+
+        self.frame_connection.pack()
+        self.frame_canvas.pack(expand=True, fill='both')
+        self.frame_result.pack()
+
+        self.entry_ip.grid(row=0, column=0)
+        self.entry_port.grid(row=1, column=0)
+        self.button_connect.grid(row=0, column=1, rowspan=2, padx=(5,0))
+        self.frame_log.grid(row=0, column=2, rowspan=2, padx=(5,0))
+        self.label_log.pack(fill='both')
+
+        self.canvas_image.pack(expand=True, fill='both')
+
+        self.label_points.grid(row=0, column=0)
+        self.button_stop.grid(row=0, column=1, padx=(5,0))
+
+        self.frame_canvas.update()
+        self.w, self.h = self.canvas_image.winfo_width(), self.canvas_image.winfo_height()
+        print(f'Canvas size: {self.w},{self.h}')
+
+        #### Start internal threads ####
+        self.q_connect = queue.Queue(maxsize=0)
+        self.q_img = queue.Queue(maxsize=1)
+        self.q_img2 = queue.Queue(maxsize=img_queue_size)
+        self.run_flag = True
+        self.thread1 = threading.Thread(target=self.update_image, name='thread1')
+        self.thread2 = threading.Thread(target=self.cap_process, name='thread2')
+        self.thread3 = threading.Thread(target=self.calc_process, name='thread3')
+        self.thread1.start()
+        self.thread2.start()
+        self.thread3.start()
+        print(f'Number of threads: {threading.active_count()}')
+        for th in threading.enumerate():
+            print('  ', th)
+
+    def event_connect(self, e):
+        self.t_log.set('')
+        if(self.t_connect.get() == self.TEXT_CONNECT):
+            url = f'http://{self.t_ip.get()}:{self.t_port.get()}/video'
+            self.q_connect.put(url)
+            self.t_connect.set(self.TEXT_DISCONNECT)
+        else:
+            self.q_connect.put(None)
+            self.t_connect.set(self.TEXT_CONNECT)
+
+    def update_image(self):
+        while self.run_flag:
+            val, img = self.q_img2.get()
+            if not val:
+                continue
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(img)
+            img = ImageOps.pad(img, (self.w,self.h))
+            self.disp_img = ImageTk.PhotoImage(image=img)
+            self.canvas_image.create_image(self.w/2,self.h/2,image=self.disp_img)
+
+    def _print_log(self, mes):
+        print(mes)
+        self.t_log.set(mes)
+
+    def cap_process(self):
+        while self.run_flag:
+            if not self.q_connect.empty():
+                url = self.q_connect.get()
+                if url == None:
+                    self.cap.release()
+                    self._print_log('Camera closed')
+                elif self.cap.open(url, cv2.CAP_FFMPEG, self.open_params):
+                    self._print_log('Camera opened')
+                else:
+                    self._print_log('Camera open failed')
+                    self.t_connect.set(self.TEXT_CONNECT)
+            elif self.cap.isOpened():
+                ret, img = self.cap.read()
+                if not ret:
+                    self._print_log('Can\'t receive frame')
+                    self.cap.release()
+                    self.t_connect.set(self.TEXT_CONNECT)
+                elif not self.q_img.full():
+                    self.q_img.put((True, img))
+    
+    def calc_process(self):
+        while self.run_flag:
+            val, img = self.q_img.get()
+            if not val:
+                self.q_img2.put((False, None))
+                continue
+            if self.t_stop.get() == self.TEXT_STOP:
+                score, img2 = calc_harupan(img, self.templates, self.svm)
+                self.t_calc_result.set(f'{score:2.1f} points')
+                if not self.q_img2.full():
+                    self.q_img2.put((True, img2))
+
+    def event_stop_button(self, e):
+        s = self.TEXT_RESUME if self.t_stop.get() == self.TEXT_STOP else self.TEXT_STOP
+        self.t_stop.set(s)
+
+    def update_canvas_size(self, e):
+        self.w, self.h = self.canvas_image.winfo_width(), self.canvas_image.winfo_height()
+
+    def cleanup_app(self):
+        self.run_flag = False
+
+        # Put dummy data to finish thread1(update_image()), thread3(calc_process())
+        if self.q_img.empty():
+            self.q_img.put((False, None))
+        if self.q_img2.empty():
+            self.q_img2.put((False, None))
+
+        self.thread1.join(timeout=10)
+        self.thread2.join(timeout=10)
+        self.thread3.join(timeout=10)
+
+        print(f'Number of threads: {threading.active_count()}')
+        for th in threading.enumerate():
+            print('  ', th)
+
+        if self.cap.isOpened():
+            self.cap.release()
+
+        self.master.destroy()
+
+######################################################
+# main
+######################################################
+def main():
+    root = tk.Tk()
+    svm_data='harupan_svm_220412.dat'
+    template_data='templates2021.json'
+    app = harupan_gui(master=root, img_queue_size=1, svm_data=svm_data, template_data=template_data)
+    app.mainloop()
+
+
+if __name__ == '__main__':
+    main()
