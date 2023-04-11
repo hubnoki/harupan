@@ -13,6 +13,8 @@ from PIL import Image, ImageOps, ImageTk
 import queue
 import threading
 
+import time
+
 ######################################################
 # Detecting contours
 ######################################################
@@ -416,6 +418,10 @@ class harupan_gui(tk.Frame):
         self.button_stop = tk.Button(self.frame_result, textvariable=self.t_stop)
         self.button_stop.bind('<Button-1>', self.event_stop_button)
 
+        #### Calculation time ####
+        self.t_calc_time = tk.StringVar(value='     ms')
+        self.label_calc_time = tk.Label(self.frame_result, font=('Consolas', 10), textvariable=self.t_calc_time)
+
         #### Place widgets ####
         self.pack(expand=True, fill='both')
 
@@ -433,6 +439,7 @@ class harupan_gui(tk.Frame):
 
         self.label_points.grid(row=0, column=0)
         self.button_stop.grid(row=0, column=1, padx=(5,0))
+        self.label_calc_time.grid(row=0, column=2, padx=(5,0))
 
         self.frame_canvas.update()
         self.w, self.h = self.canvas_image.winfo_width(), self.canvas_image.winfo_height()
@@ -506,9 +513,12 @@ class harupan_gui(tk.Frame):
                 self.q_img2.put((False, None))
                 continue
             if self.t_stop.get() == self.TEXT_STOP:
+                t = time.time()
                 score, img2 = calc_harupan(img, self.templates, self.svm)
-                self.t_calc_result.set(f'{score:2.1f} points')
+                t = time.time() - t
                 if not self.q_img2.full():
+                    self.t_calc_result.set(f'{score:2.1f} points')
+                    self.t_calc_time.set(f'{int(t*1000):4d} ms')
                     self.q_img2.put((True, img2))
 
     def event_stop_button(self, e):
