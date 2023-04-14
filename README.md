@@ -3,9 +3,8 @@
 春のパン祭りシール台紙を撮影して、点数を自動集計します。  
 面倒な手計算とおさらば！
 
-<img src="harupan_example_230415a.gif" width="400px">
+[](https://github.com/hubnoki/harupan/blob/master/doc_images/harupan_example_230415b.gif)
 
-[](doc_images/harupan_example_230415b.gif)
 
 **----注意----**
 
