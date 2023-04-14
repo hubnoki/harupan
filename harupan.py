@@ -555,8 +555,8 @@ class harupan_gui(tk.Frame):
 ######################################################
 def main():
     root = tk.Tk()
-    svm_data='harupan_svm_220412.dat'
-    template_data='templates2021.json'
+    svm_data='data/harupan_svm_220412.dat'
+    template_data='data/templates2021.json'
     app = harupan_gui(master=root, img_queue_size=1, svm_data=svm_data, template_data=template_data)
     app.mainloop()
 
