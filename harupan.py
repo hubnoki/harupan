@@ -14,6 +14,8 @@ import queue
 import threading
 
 import time
+import sys
+import os
 
 ######################################################
 # Detecting contours
@@ -553,10 +555,15 @@ class harupan_gui(tk.Frame):
 ######################################################
 # main
 ######################################################
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 def main():
     root = tk.Tk()
-    svm_data='data/harupan_svm_220412.dat'
-    template_data='data/templates2021.json'
+    svm_data = resource_path('data/harupan_svm_220412.dat')
+    template_data = resource_path('data/templates2021.json')
     app = harupan_gui(master=root, img_queue_size=1, svm_data=svm_data, template_data=template_data)
     app.mainloop()
 
