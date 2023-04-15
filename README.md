@@ -5,8 +5,6 @@
 
 ![](doc_images/harupan_example_230415b.gif)
 
-![](https://github.com/hubnoki/harupan/blob/master/doc_images/harupan_example_230415b.gif)
-
 
 **----注意----**
 
