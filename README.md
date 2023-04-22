@@ -32,8 +32,11 @@
 # exe生成方法(Pyinstaller, Windows)
 
 ```
-pyinstaller harupan.py --add-data data\harupan_svm_220412.dat;data --add-data data\templates2021.json;data --noconsole --onefile
+PowerShellで下記実行。  
+`dist`はexe出力先フォルダ名になります。
 
+```
+harupan_pyinstaller.ps1 dist
 ```
 
 

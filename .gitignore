@@ -1,3 +1,6 @@
 /__pycache__/*
+/pyinstaller/*
+!/pyinstaller/harupan.spec
+/nuitka/*
 /build/*
 /dist*/*

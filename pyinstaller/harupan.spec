@@ -5,10 +5,10 @@ block_cipher = None
 
 
 a = Analysis(
-    ['harupan.py'],
+    ['..\\harupan.py'],
     pathex=[],
     binaries=[],
-    datas=[('data\\harupan_svm_220412.dat', 'data'), ('data\\templates2021.json', 'data')],
+    datas=[('..\\data\\harupan_svm_220412.dat', 'data'), ('..\\data\\templates2021.json', 'data')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -41,4 +41,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['..\\icon\\harupan_icon4.png'],
 )
