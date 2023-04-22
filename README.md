@@ -29,9 +29,21 @@
 
 <br/>
 
-# exe生成方法(Pyinstaller, Windows)
+# Python環境構築手順
+
+Anacondaを使う前提です。
 
 ```
+conda create -n test python=3.7
+conda activate test
+pip install -r requirements.txt
+```
+
+
+<br/>
+
+# exe生成方法(Pyinstaller, Windows)
+
 PowerShellで下記実行。  
 `dist`はexe出力先フォルダ名になります。
 
