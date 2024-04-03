@@ -393,10 +393,8 @@ class harupan_gui(tk.Frame):
         self.frame_result = tk.Frame(self)
 
         #### Entries for connection information ####
-        self.t_ip = tk.StringVar(value='192.168.1.7')
-        self.t_port = tk.StringVar(value='4747')
-        self.entry_ip = tk.Entry(self.frame_connection, textvariable=self.t_ip)
-        self.entry_port = tk.Entry(self.frame_connection, textvariable=self.t_port)
+        self.t_url = tk.StringVar(value='http://192.168.1.7:4747/video')
+        self.entry_url = tk.Entry(self.frame_connection, textvariable=self.t_url)
 
         #### Connect button ####
         self.t_connect = tk.StringVar(value=self.TEXT_CONNECT)
@@ -431,10 +429,9 @@ class harupan_gui(tk.Frame):
         self.frame_canvas.pack(expand=True, fill='both')
         self.frame_result.pack()
 
-        self.entry_ip.grid(row=0, column=0)
-        self.entry_port.grid(row=1, column=0)
-        self.button_connect.grid(row=0, column=1, rowspan=2, padx=(5,0))
-        self.frame_log.grid(row=0, column=2, rowspan=2, padx=(5,0))
+        self.entry_url.grid(row=0, column=0)
+        self.button_connect.grid(row=0, column=1, padx=(5,0))
+        self.frame_log.grid(row=0, column=2, padx=(5,0))
         self.label_log.pack(fill='both')
 
         self.canvas_image.pack(expand=True, fill='both')
@@ -465,8 +462,7 @@ class harupan_gui(tk.Frame):
     def event_connect(self, e):
         self.t_log.set('')
         if(self.t_connect.get() == self.TEXT_CONNECT):
-            url = f'http://{self.t_ip.get()}:{self.t_port.get()}/video'
-            self.q_connect.put(url)
+            self.q_connect.put(self.t_url.get())
             self.t_connect.set(self.TEXT_DISCONNECT)
         else:
             self.q_connect.put(None)
